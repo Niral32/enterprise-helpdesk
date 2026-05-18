@@ -1,0 +1,189 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  # Host port 3307 → container port 3306 to avoid conflicts with a local
+  # MySQL install. Other services connect over the docker bridge network at
+  # `mysql:3306`, so the host port is only relevant if you want to connect
+  # with a GUI client like TablePlus from your Mac.
+  mysql:
+    image: mysql:8.0
+    container_name: helpdesk-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_USER: helpdesk_user
+      MYSQL_PASSWORD: helpdesk_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+    networks:
+      - helpdesk-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: ../../docker/Dockerfile.gateway
+    container_name: helpdesk-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      - auth-service
+      - user-service
+      - ticket-service
+      - asset-service
+      - notification-service
+    networks:
+      - helpdesk-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: ../../docker/Dockerfile.auth
+    container_name: helpdesk-auth
+    ports:
+      - "8001:8001"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/auth_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: helpdesk_user
+      SPRING_DATASOURCE_PASSWORD: helpdesk_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      USER_SERVICE_BASE_URL: http://user-service:8002
+      BOOTSTRAP_ADMIN_EMAIL: niralpatel988@gmail.com
+      BOOTSTRAP_ADMIN_PASSWORD: niral2000
+      INTERNAL_API_SECRET: dev-internal-sync-secret-change-in-prod
+    depends_on:
+      mysql:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+    networks:
+      - helpdesk-network
+
+  # User Service
+  user-service:
+    build:
+      context: ./backend/user-service
+      dockerfile: ../../docker/Dockerfile.user
+    container_name: helpdesk-user
+    ports:
+      - "8002:8002"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: helpdesk_user
+      SPRING_DATASOURCE_PASSWORD: helpdesk_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      HELPDESK_AUTH_SERVICE_BASE_URL: http://auth-service:8001
+      INTERNAL_API_SECRET: dev-internal-sync-secret-change-in-prod
+      HELPDESK_AVATARS_PATH: /var/helpdesk/avatars
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - avatars_data:/var/helpdesk/avatars
+    networks:
+      - helpdesk-network
+
+  # Ticket Service
+  ticket-service:
+    build:
+      context: ./backend/ticket-service
+      dockerfile: ../../docker/Dockerfile.ticket
+    container_name: helpdesk-ticket
+    ports:
+      - "8003:8003"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ticket_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: helpdesk_user
+      SPRING_DATASOURCE_PASSWORD: helpdesk_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      HELPDESK_USER_SERVICE_BASE_URL: http://user-service:8002
+      HELPDESK_ASSET_SERVICE_BASE_URL: http://asset-service:8004
+      HELPDESK_NOTIFICATION_SERVICE_BASE_URL: http://notification-service:8005
+      INTERNAL_API_SECRET: dev-internal-sync-secret-change-in-prod
+      HELPDESK_ATTACHMENTS_PATH: /var/helpdesk/attachments
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - attachments_data:/var/helpdesk/attachments
+    networks:
+      - helpdesk-network
+
+  # Asset Service
+  asset-service:
+    build:
+      context: ./backend/asset-service
+      dockerfile: ../../docker/Dockerfile.asset
+    container_name: helpdesk-asset
+    ports:
+      - "8004:8004"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/asset_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: helpdesk_user
+      SPRING_DATASOURCE_PASSWORD: helpdesk_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - helpdesk-network
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: ../../docker/Dockerfile.notification
+    container_name: helpdesk-notification
+    ports:
+      - "8005:8005"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/notification_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: helpdesk_user
+      SPRING_DATASOURCE_PASSWORD: helpdesk_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - helpdesk-network
+
+  # Frontend (Vite build → nginx serve)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+      args:
+        # Same-origin /api → nginx proxies to api-gateway (see frontend/nginx.conf).
+        VITE_API_URL: "/api"
+    container_name: helpdesk-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api-gateway
+    networks:
+      - helpdesk-network
+
+volumes:
+  mysql_data:
+    driver: local
+  # Profile photos served by user-service.
+  avatars_data:
+    driver: local
+  # Ticket attachments served by ticket-service.
+  attachments_data:
+    driver: local
+
+networks:
+  helpdesk-network:
+    driver: bridge

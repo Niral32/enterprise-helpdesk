@@ -1,0 +1,114 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        # Auth admin routes — JWT required so gateway injects X-User-Id / X-User-Role for auth-service.
+        # Must be matched BEFORE the generic /api/auth/** route (more specific path + lower order).
+        - id: auth-service-admin
+          uri: http://auth-service:8001
+          order: 0
+          predicates:
+            - Path=/api/auth/admin/**
+          filters:
+            - name: JwtAuthenticationFilter
+
+        # Auth Service (login, register, refresh, validate — no JWT filter)
+        # No StripPrefix: downstream services expose /api/... on context-path /
+        - id: auth-service
+          uri: http://auth-service:8001
+          order: 1
+          predicates:
+            - Path=/api/auth/**
+
+        # User Service — avatar file fetches must work in <img> tags, which
+        # the browser sends without an Authorization header. Route them
+        # publicly (filenames embed a UUID so they aren't guessable).
+        # MUST be ordered BEFORE the generic /api/users/** route.
+        - id: user-avatars-public
+          uri: http://user-service:8002
+          order: 0
+          predicates:
+            - Path=/api/users/avatars/**
+
+        # User Service
+        - id: user-service
+          uri: http://user-service:8002
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - name: JwtAuthenticationFilter
+
+        # Ticket attachment download — must work for plain <img src=> in the
+        # browser, so it bypasses the JWT filter. Inline IDs are surrogate
+        # numerics not easily guessable for an internal helpdesk. Must come
+        # BEFORE the generic /api/tickets/** route.
+        - id: ticket-attachments-public
+          uri: http://ticket-service:8003
+          order: 0
+          predicates:
+            - Path=/api/tickets/attachments/*/download
+
+        # Ticket Service
+        - id: ticket-service
+          uri: http://ticket-service:8003
+          predicates:
+            - Path=/api/tickets/**
+          filters:
+            - name: JwtAuthenticationFilter
+
+        # Asset Service
+        - id: asset-service
+          uri: http://asset-service:8004
+          predicates:
+            - Path=/api/assets/**
+          filters:
+            - name: JwtAuthenticationFilter
+
+        # Notification Service
+        - id: notification-service
+          uri: http://notification-service:8005
+          predicates:
+            - Path=/api/notifications/**
+          filters:
+            - name: JwtAuthenticationFilter
+
+      # Global CORS configuration
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:5173"
+              - "http://127.0.0.1:5173"
+              - "http://localhost:3000"
+              - "http://127.0.0.1:3000"
+              - "http://frontend:5173"
+            allowedMethods: [GET, POST, PUT, DELETE, OPTIONS, PATCH]
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+server:
+  port: 8000
+  servlet:
+    context-path: /
+
+jwt:
+  secret: enterprise-helpdesk-jwt-signing-key-please-replace-in-production-2026-256bit-strong
+  header: Authorization
+  prefix: "Bearer "
+  expiration: 900000
+
+logging:
+  level:
+    root: INFO
+    com.helpdesk: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+
+# OpenAPI: use each service directly (e.g. http://localhost:8001/swagger-ui.html) or add explicit gateway routes per service.
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

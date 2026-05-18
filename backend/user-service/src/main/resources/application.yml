@@ -1,0 +1,75 @@
+spring:
+  application:
+    name: user-service
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  datasource:
+    url: jdbc:mysql://mysql:3306/user_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: helpdesk_user
+    password: helpdesk_pass
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+    show-sql: false
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+server:
+  port: 8002
+  servlet:
+    context-path: /
+
+helpdesk:
+  auth-service:
+    base-url: ${HELPDESK_AUTH_SERVICE_BASE_URL:http://localhost:8001}
+  internal-api:
+    secret: ${INTERNAL_API_SECRET:dev-internal-sync-secret-change-in-prod}
+  storage:
+    # Local disk path where avatar images are written. Backed by a Docker
+    # volume in docker-compose.yml so uploads survive container rebuilds.
+    avatars-path: ${HELPDESK_AVATARS_PATH:/var/helpdesk/avatars}
+
+jwt:
+  secret: enterprise-helpdesk-jwt-signing-key-please-replace-in-production-2026-256bit-strong
+  header: Authorization
+  prefix: "Bearer "
+  expiration: 900000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+
+logging:
+  level:
+    root: INFO
+    com.helpdesk: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

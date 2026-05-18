@@ -1,0 +1,101 @@
+# IDEs
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build outputs
+target/
+dist/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven
+.m2/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# package-lock.json and yarn.lock SHOULD be committed for reproducible builds.
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.example
+
+# IDE specific
+*.iml
+*.iws
+*.ipr
+.gradle
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# OS
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+logs/
+*.log
+log/
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+.cache/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Docker
+docker-compose.override.yml
+
+# Frontend
+frontend/dist/
+frontend/.vite/
+# Compiled / generated config artefacts
+*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
+
+# Backend
+backend/.gradle
+backend/gradle/
+
+# Coverage
+coverage/
+.nyc_output/
+htmlcov/
+
+# Misc
+.venv/
+venv/
+env/
+ENV/
+temp/
+tmp/
