@@ -3,7 +3,9 @@ package com.helpdesk.ticket.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import com.helpdesk.ticket.config.CacheConfig;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -42,6 +44,20 @@ public class DirectoryClient {
         this.restTemplate = restTemplate;
     }
 
+    /**
+     * Cached: keyed by user id, lives in the "directoryUsers" Redis cache
+     * (TTL 5m, see CacheConfig).
+     *
+     * Caveats:
+     *   - `unless = "#result == null"` keeps transient lookup failures from
+     *     being pinned in the cache for 5 minutes.
+     *   - Spring Boot's auto-configured ObjectMapper includes the Jackson JDK8
+     *     module, so Optional round-trips through the JSON serializer fine.
+     *   - Spring caching uses proxy-based AOP, so callers must inject
+     *     DirectoryClient as a bean (they all do). A self-invocation inside
+     *     this class would bypass the proxy and miss the cache.
+     */
+    @Cacheable(cacheNames = CacheConfig.CACHE_USERS, key = "#id", unless = "#result == null")
     public Optional<UserJson> getUser(Long id) {
         if (id == null) {
             return Optional.empty();
@@ -64,6 +80,10 @@ public class DirectoryClient {
         }
     }
 
+    /**
+     * Cached: keyed by asset id, lives in the "directoryAssets" cache (TTL 10m).
+     */
+    @Cacheable(cacheNames = CacheConfig.CACHE_ASSETS, key = "#id", unless = "#result == null")
     public Optional<AssetJson> getAsset(Long id) {
         if (id == null) {
             return Optional.empty();
@@ -80,6 +100,13 @@ public class DirectoryClient {
 
     /**
      * Batch user lookup for comment lists: id → "First Last (ROLE)".
+     *
+     * NOTE: This iterates and calls {@link #getUser(Long)} on `this`, which is
+     * a self-invocation that BYPASSES the Spring cache proxy. The current
+     * codebase doesn't call this method (the loop lives in TicketService
+     * which uses an injected DirectoryClient bean and so hits the cache).
+     * Kept here for API completeness; if you start calling it, restructure
+     * to inject the proxy or use {@code AopContext.currentProxy()}.
      */
     public Map<Long, UserJson> getUsersBatch(Long... ids) {
         Map<Long, UserJson> out = new HashMap<>();

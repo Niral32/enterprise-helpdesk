@@ -48,6 +48,14 @@
             <artifactId>flyway-mysql</artifactId>
         </dependency>
 
+        <!-- Bucket4j — token-bucket rate limiting for /auth/login.
+             Used to throttle brute-force password guessing attempts. -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>

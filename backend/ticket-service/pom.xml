@@ -47,6 +47,17 @@
             <artifactId>flyway-mysql</artifactId>
         </dependency>
 
+        <!-- Redis — caches DirectoryClient user/asset lookups so a 50-ticket
+             list isn't 100 round-trips to user-service. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>

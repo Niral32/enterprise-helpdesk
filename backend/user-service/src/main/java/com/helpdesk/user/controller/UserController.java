@@ -8,6 +8,7 @@ import com.helpdesk.user.service.UserService;
 import com.helpdesk.user.storage.AvatarStorageService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -197,22 +198,20 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update user (ADMIN only via gateway)",
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update user (ADMIN only)",
             description = "Updates firstName, lastName, department, phone, role, status. "
                     + "Email changes go through PATCH /{id}/email so they can be synced to auth-service.")
     public ResponseEntity<UserDTO> updateUser(
             @PathVariable Long id,
-            @RequestBody UserDTO userDTO,
-            @RequestHeader(value = "X-User-Role", required = false) String requesterRole) {
+            @RequestBody UserDTO userDTO) {
         log.info("REST request to update user with ID: {}", id);
-        if (requesterRole == null || !"ADMIN".equalsIgnoreCase(requesterRole.trim())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
         UserDTO updatedUser = userService.updateUser(id, userDTO);
         return ResponseEntity.ok(updatedUser);
     }
 
     @PatchMapping("/{id}/email")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin: change a user's email",
             description = "Validates uniqueness in user_db and syncs the new email to auth_db. Body: {\"email\": \"...\"}.")
     public ResponseEntity<UserDTO> changeEmail(
@@ -223,14 +222,10 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete user (ADMIN only via gateway)")
-    public ResponseEntity<Void> deleteUser(
-            @PathVariable Long id,
-            @RequestHeader(value = "X-User-Role", required = false) String requesterRole) {
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete user (ADMIN only)")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         log.info("REST request to delete user with ID: {}", id);
-        if (requesterRole == null || !"ADMIN".equalsIgnoreCase(requesterRole.trim())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
@@ -242,8 +237,9 @@ public class UserController {
     // ----------------------------------------------------------------
 
     @PostMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin: create user (USER/TECHNICIAN/ADMIN)",
-            description = "Allows ADMIN to create technicians or end-users. Requires X-User-Role=ADMIN.")
+            description = "Allows ADMIN to create technicians or end-users.")
     public ResponseEntity<UserDTO> adminCreateUser(
             @RequestBody UserDTO userDTO,
             @RequestHeader(value = "X-User-Role", required = false) String role) {
@@ -252,6 +248,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/block")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin: block (suspend) a user")
     public ResponseEntity<UserDTO> blockUser(
             @PathVariable Long id,
@@ -260,6 +257,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/unblock")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin: unblock a previously suspended user")
     public ResponseEntity<UserDTO> unblockUser(
             @PathVariable Long id,
@@ -268,6 +266,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin: deactivate (soft-delete) a user")
     public ResponseEntity<UserDTO> deactivateUser(
             @PathVariable Long id,
@@ -276,6 +275,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/role")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin: change a user's role",
             description = "Body: {\"role\": \"TECHNICIAN\"}. Cannot demote the last active admin.")
     public ResponseEntity<UserDTO> changeRole(

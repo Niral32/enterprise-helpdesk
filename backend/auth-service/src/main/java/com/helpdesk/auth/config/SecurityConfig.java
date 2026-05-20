@@ -1,5 +1,6 @@
 package com.helpdesk.auth.config;
 
+import com.helpdesk.auth.security.LoginRateLimitFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -9,6 +10,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -16,15 +18,23 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 
 /**
- * Security configuration for authentication service
+ * Security configuration for the authentication service.
+ *
+ *   - All /api/auth/** endpoints are publicly reachable (you can't sign in
+ *     to get a JWT if you need a JWT to call the sign-in endpoint).
+ *   - The login endpoint is protected by a per-IP Bucket4j rate-limiter
+ *     (see {@link LoginRateLimitFilter}) to slow brute-force attempts.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    /**
-     * Configure security filter chain
-     */
+    private final LoginRateLimitFilter loginRateLimitFilter;
+
+    public SecurityConfig(LoginRateLimitFilter loginRateLimitFilter) {
+        this.loginRateLimitFilter = loginRateLimitFilter;
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -38,7 +48,11 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                     .anyRequest().authenticated()
-            );
+            )
+            // Rate-limit /api/auth/login BEFORE Spring's usual filter chain
+            // gets a chance to do real work — keeps brute-force traffic
+            // off the password encoder and the database.
+            .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

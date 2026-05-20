@@ -26,6 +26,27 @@ services:
     networks:
       - helpdesk-network
 
+  # Redis — used by ticket-service to cache user/asset directory lookups
+  # (DirectoryClient). 5-minute TTL on user lookups, 10 minutes on assets.
+  # We pin to alpine for a small image and use the default port 6379.
+  redis:
+    image: redis:7-alpine
+    container_name: helpdesk-redis
+    ports:
+      - "6379:6379"
+    # Persist the cache so a restart doesn't immediately invalidate every
+    # ticket list — `appendonly yes` enables AOF persistence.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - helpdesk-network
+
   # API Gateway
   api-gateway:
     build:
@@ -112,8 +133,12 @@ services:
       HELPDESK_NOTIFICATION_SERVICE_BASE_URL: http://notification-service:8005
       INTERNAL_API_SECRET: dev-internal-sync-secret-change-in-prod
       HELPDESK_ATTACHMENTS_PATH: /var/helpdesk/attachments
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - attachments_data:/var/helpdesk/attachments
@@ -176,6 +201,9 @@ services:
 
 volumes:
   mysql_data:
+    driver: local
+  # Redis AOF persistence — survives container restarts.
+  redis_data:
     driver: local
   # Profile photos served by user-service.
   avatars_data:

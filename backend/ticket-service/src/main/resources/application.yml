@@ -2,6 +2,15 @@ spring:
   application:
     name: ticket-service
 
+  # Redis is used here only for the Spring Cache abstraction
+  # (see CacheConfig + @Cacheable on DirectoryClient). Disable the
+  # Spring-Data-Redis repository scanner so it doesn't try to interpret the
+  # JPA TicketRepository / CommentRepository as Redis key-value stores.
+  data:
+    redis:
+      repositories:
+        enabled: false
+
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration

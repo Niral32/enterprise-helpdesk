@@ -14,6 +14,7 @@ import com.helpdesk.ticket.storage.AttachmentStorageService;
 import com.helpdesk.ticket.service.TicketService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -93,12 +94,9 @@ public class TicketController {
     }
 
     @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "ADMIN: all tickets across the system")
-    public ResponseEntity<List<TicketDTO>> getAllForAdmin(
-            @RequestHeader(value = "X-User-Role", required = false) String roleHeader) {
-        if (!TicketService.isAdmin(roleHeader)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+    public ResponseEntity<List<TicketDTO>> getAllForAdmin() {
         return ResponseEntity.ok(ticketService.getAllTickets());
     }
 
