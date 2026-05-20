@@ -57,7 +57,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/auth_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: helpdesk_user
       SPRING_DATASOURCE_PASSWORD: helpdesk_pass
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       USER_SERVICE_BASE_URL: http://user-service:8002
       BOOTSTRAP_ADMIN_EMAIL: niralpatel988@gmail.com
       BOOTSTRAP_ADMIN_PASSWORD: niral2000
@@ -82,7 +82,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: helpdesk_user
       SPRING_DATASOURCE_PASSWORD: helpdesk_pass
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       HELPDESK_AUTH_SERVICE_BASE_URL: http://auth-service:8001
       INTERNAL_API_SECRET: dev-internal-sync-secret-change-in-prod
       HELPDESK_AVATARS_PATH: /var/helpdesk/avatars
@@ -106,7 +106,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ticket_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: helpdesk_user
       SPRING_DATASOURCE_PASSWORD: helpdesk_pass
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       HELPDESK_USER_SERVICE_BASE_URL: http://user-service:8002
       HELPDESK_ASSET_SERVICE_BASE_URL: http://asset-service:8004
       HELPDESK_NOTIFICATION_SERVICE_BASE_URL: http://notification-service:8005
@@ -132,7 +132,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/asset_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: helpdesk_user
       SPRING_DATASOURCE_PASSWORD: helpdesk_pass
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
     depends_on:
       mysql:
         condition: service_healthy
@@ -151,7 +151,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/notification_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: helpdesk_user
       SPRING_DATASOURCE_PASSWORD: helpdesk_pass
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
     depends_on:
       mysql:
         condition: service_healthy

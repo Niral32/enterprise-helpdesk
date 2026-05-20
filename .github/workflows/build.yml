@@ -1,0 +1,139 @@
+# =============================================================================
+#  CI — build + test on every push and pull request
+#
+#  What it does:
+#    1. Backend  → compiles every Spring Boot service and runs the JUnit/
+#                  Mockito unit-test suite (72 tests as of Day 1).
+#    2. Frontend → installs npm deps, runs `tsc --noEmit` (type check), then
+#                  builds the production bundle.
+#    3. Docker   → builds every service image to catch Dockerfile regressions
+#                  early. Images aren't pushed anywhere — this is just a
+#                  compile gate for the container builds.
+#
+#  Caches are aggressive (Maven .m2 + npm) so re-runs are fast (~1 min after
+#  first run). The badge URL for README.md is:
+#
+#      https://github.com/Niral32/enterprise-helpdesk/actions/workflows/build.yml/badge.svg
+# =============================================================================
+
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # lets you re-run from the Actions tab UI
+
+# Cancel an in-flight build when a new commit is pushed to the same branch.
+# Without this, fast-typing devs queue up wasted runners.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  #  Backend: matrix over each Spring Boot service. Each leg runs in parallel
+  #  on a fresh runner so a failing service doesn't block the others.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: backend / ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - auth-service
+          - user-service
+          - ticket-service
+          - asset-service
+          - notification-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          # Built-in Maven cache — keyed off the pom files so it only rebuilds
+          # when dependencies change.
+          cache: maven
+
+      - name: Build + test ${{ matrix.service }}
+        working-directory: backend/${{ matrix.service }}
+        # -B = batch (no interactive prompts)
+        # -ntp = no transfer progress (quieter logs)
+        run: mvn -B -ntp verify
+
+      - name: Upload Surefire test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ matrix.service }}
+          path: backend/${{ matrix.service }}/target/surefire-reports
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  #  Frontend: type-check + production build
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Build production bundle
+        working-directory: frontend
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  #  Docker images — depends on backend + frontend passing first so we don't
+  #  waste a 10-minute Docker build when unit tests already failed.
+  # ---------------------------------------------------------------------------
+  docker:
+    name: docker / ${{ matrix.name }}
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: api-gateway,          context: ./backend/api-gateway,          dockerfile: ./docker/Dockerfile.gateway }
+          - { name: auth-service,         context: ./backend/auth-service,         dockerfile: ./docker/Dockerfile.auth }
+          - { name: user-service,         context: ./backend/user-service,         dockerfile: ./docker/Dockerfile.user }
+          - { name: ticket-service,       context: ./backend/ticket-service,       dockerfile: ./docker/Dockerfile.ticket }
+          - { name: asset-service,        context: ./backend/asset-service,        dockerfile: ./docker/Dockerfile.asset }
+          - { name: notification-service, context: ./backend/notification-service, dockerfile: ./docker/Dockerfile.notification }
+          - { name: frontend,             context: ./frontend,                     dockerfile: ./docker/Dockerfile.frontend }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.name }} image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          # GitHub Actions cache for Docker layers — speeds up rebuilds a lot.
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max

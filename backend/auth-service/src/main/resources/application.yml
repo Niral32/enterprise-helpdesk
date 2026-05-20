@@ -15,12 +15,26 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      # `validate` instead of `update` — Hibernate verifies that the entity
+      # mapping matches the DB schema on startup, but never changes the
+      # schema. All schema evolution now goes through Flyway migrations
+      # under src/main/resources/db/migration. This catches drift early
+      # (a mismatched column type fails app startup, not the next query).
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: true
+
+  flyway:
+    enabled: true
+    # Existing databases (from before Flyway was introduced) already have
+    # the V1 schema, so baseline at version 1 and skip executing V1__init.
+    # Fresh databases will execute V1 normally because they're empty.
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
 
   servlet:
     multipart:
